@@ -17,7 +17,9 @@ class DiscreteStochasticDecisionProcess:
     def one_hot(self, n):
         buffer = np.zeros(TOTAL_STATES)
         buffer[n] = 1.0
-        return np.ndarray((TOTAL_STATES), buffer=buffer, dtype=np.float)
+        np.expand_dims(buffer, axis=0)
+        # add batch dimension
+        return np.ndarray((1, TOTAL_STATES), buffer=buffer, dtype=np.float)
     
     # return format: current state, reward, is done, additional info
     def step(self, action):
