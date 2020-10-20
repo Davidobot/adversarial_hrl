@@ -91,6 +91,7 @@ class AtariPreprocessing(gym.Wrapper):
                 new_lives = self.ale.lives()
                 done = done or new_lives < self.lives
                 self.lives = new_lives
+            self.lives = self.ale.lives()
                 
             # stack older frames
             if self.grayscale_obs:
