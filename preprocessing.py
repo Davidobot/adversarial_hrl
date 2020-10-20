@@ -65,6 +65,7 @@ class AtariPreprocessing(gym.Wrapper):
         # buffer of most recent two observations for max pooling
         if grayscale_obs:
             self.obs_buffer = [np.empty(env.observation_space.shape[:2], dtype=np.uint8) for _ in range(frame_skip)]
+            self.obs_buffer_coloured = [np.empty(env.observation_space.shape, dtype=np.uint8) for _ in range(frame_skip)]
         else:
             self.obs_buffer = [np.empty(env.observation_space.shape, dtype=np.uint8) for _ in range(frame_skip)]
 
@@ -94,6 +95,7 @@ class AtariPreprocessing(gym.Wrapper):
             # stack older frames
             if self.grayscale_obs:
                 self.ale.getScreenGrayscale(self.obs_buffer[t])
+                self.ale.getScreenRGB2(self.obs_buffer_coloured[t])
             else:
                 self.ale.getScreenRGB2(self.obs_buffer[t])
 
@@ -101,6 +103,7 @@ class AtariPreprocessing(gym.Wrapper):
                 # clear others
                 for tt in range(t + 1, self.frame_skip):
                     self.obs_buffer[tt].fill(0)
+                    self.obs_buffer_coloured[tt].fill(0)
                 break
             
         return self._get_obs(), R, done, info
@@ -117,11 +120,13 @@ class AtariPreprocessing(gym.Wrapper):
         self.lives = self.ale.lives()
         if self.grayscale_obs:
             self.ale.getScreenGrayscale(self.obs_buffer[0])
+            self.ale.getScreenRGB2(self.obs_buffer_coloured[0])
         else:
             self.ale.getScreenRGB2(self.obs_buffer[0])
             
         for t in range(1, self.frame_skip):
             self.obs_buffer[t].fill(0)
+            self.obs_buffer_coloured[t].fill(0)
         
         return self._get_obs()
 
@@ -131,6 +136,16 @@ class AtariPreprocessing(gym.Wrapper):
        
         obs = cv2.resize(obs, (self.screen_size, self.screen_size), interpolation=cv2.INTER_AREA)
 
+        if self.scale_obs:
+            obs = np.asarray(obs, dtype=np.float32) / 255.0
+        else:
+            obs = np.asarray(obs, dtype=np.uint8)
+
+        return obs
+    
+    def _get_obs_coloured(self):
+        obs = np.stack(self.obs_buffer_coloured, 3)
+        
         if self.scale_obs:
             obs = np.asarray(obs, dtype=np.float32) / 255.0
         else:
