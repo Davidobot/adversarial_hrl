@@ -16,6 +16,10 @@ from gym import spaces
 # key reward +10
 # lock reward +40
 
+WALL_HIT = -0.2
+KEY = 10
+CAR = 40
+
 class GridWorld:
     def __init__(self, ROOM_SIZE=3, ROOM_COUNT=2):
         self.ROOM_SIZE = ROOM_SIZE
@@ -110,7 +114,7 @@ class GridWorld:
         if px + dx < 0 or px + dx >= self.ROOM_SIZE * self.ROOM_COUNT or\
            py + dy < 0 or py + dy >= self.ROOM_SIZE * self.ROOM_COUNT:
             # can't leave rooms
-            reward = -2
+            reward = WALL_HIT
         else:
             # on border, need door to cross
             if (px % self.ROOM_SIZE == 0 and (px + dx) % self.ROOM_SIZE == self.ROOM_SIZE - 1) or\
@@ -120,7 +124,7 @@ class GridWorld:
                 if self.allowed(self.player, new_pos):
                     self.player = new_pos
                 else:
-                    reward = -2
+                    reward = WALL_HIT
             else:
                 self.player = new_pos
         
@@ -128,10 +132,10 @@ class GridWorld:
         if self.player == self.key:
             self.key = -1
             self.visited_key = True
-            reward = 10
+            reward = KEY
         if self.player == self.car and self.visited_key:
             self.car = -1
-            reward += 40
+            reward += CAR
             done = True
         
         if self.steps > self.MAX_STEPS:
