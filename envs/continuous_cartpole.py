@@ -140,10 +140,6 @@ class ContinuousCartPoleEnv(gym.Env):
             or x > self.x_threshold
             or theta < -self.theta_threshold_radians
             or theta > self.theta_threshold_radians
-            or x_dot < -self.vel_threshold
-            or x_dot > self.vel_threshold
-            or theta_dot < -self.angular_vel_threshold
-            or theta_dot > self.angular_vel_threshold
         )
 
         if not done:
