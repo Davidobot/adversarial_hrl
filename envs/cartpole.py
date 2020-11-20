@@ -11,7 +11,7 @@ from gym.utils import seeding
 import numpy as np
 
 
-class ContinuousCartPoleEnv(gym.Env):
+class CartPoleEnv(gym.Env):
     """
     Description:
         A pole is attached by an un-actuated joint to a cart, which moves along
@@ -91,11 +91,7 @@ class ContinuousCartPoleEnv(gym.Env):
                          self.angular_vel_threshold * 2],
                         dtype=np.float32)
 
-        self.action_space = spaces.Box(
-            low=-self.force_mag,
-            high=self.force_mag, shape=(1,),
-            dtype=np.float32
-        )
+        self.action_space = spaces.Discrete(2)
         self.observation_space = spaces.Box(-self.high, self.high, dtype=np.float32)
 
         self.seed()
@@ -109,10 +105,11 @@ class ContinuousCartPoleEnv(gym.Env):
         return [seed]
 
     def step(self, action):
-        action = np.clip(action, -self.force_mag, self.force_mag)[0]
+        err_msg = "%r (%s) invalid" % (action, type(action))
+        assert self.action_space.contains(action), err_msg
 
         x, x_dot, theta, theta_dot = self.state
-        force = action
+        force = self.force_mag if action == 1 else -self.force_mag
         costheta = math.cos(theta)
         sintheta = math.sin(theta)
 
@@ -164,7 +161,7 @@ class ContinuousCartPoleEnv(gym.Env):
             reward = 0.0
 
         return self._norm_obs(self.state) if self.normalise_observations else np.array(self.state), reward, done, {}
-        
+
     def _norm_obs(self, state):
         # normalise into 0.0 to 1.0 range
         return np.divide(np.array(state) + self.high, 2 * self.high)
