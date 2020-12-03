@@ -63,7 +63,7 @@ class ContinuousCartPoleEnv(gym.Env):
         'video.frames_per_second': 50
     }
 
-    def __init__(self, normalise_observations = False):
+    def __init__(self):
         self.gravity = 9.8
         self.masscart = 1.0
         self.masspole = 0.1
@@ -78,17 +78,15 @@ class ContinuousCartPoleEnv(gym.Env):
         self.theta_threshold_radians = 12 * 2 * math.pi / 360
         self.x_threshold = 2.4
         
-        # instead of infinities
-        self.normalise_observations = normalise_observations
         self.vel_threshold = self.x_threshold * 20
         self.angular_vel_threshold = self.theta_threshold_radians * 20
 
         # Angle limit set to 2 * theta_threshold_radians so failing observation
         # is still within bounds.
-        self.high = np.array([self.x_threshold * 2,
-                         self.vel_threshold * 2,
+        high = np.array([self.x_threshold * 2,
+                         self.vel_threshold * 2, # np.finfo(np.float32).max,
                          self.theta_threshold_radians * 2,
-                         self.angular_vel_threshold * 2],
+                         self.angular_vel_threshold * 2], # np.finfo(np.float32).max
                         dtype=np.float32)
 
         self.action_space = spaces.Box(
@@ -96,7 +94,7 @@ class ContinuousCartPoleEnv(gym.Env):
             high=self.force_mag, shape=(1,),
             dtype=np.float32
         )
-        self.observation_space = spaces.Box(-self.high, self.high, dtype=np.float32)
+        self.observation_space = spaces.Box(-high, high, dtype=np.float32)
 
         self.seed()
         self.viewer = None
@@ -159,16 +157,12 @@ class ContinuousCartPoleEnv(gym.Env):
             self.steps_beyond_done += 1
             reward = 0.0
 
-        return self._norm_obs(self.state) if self.normalise_observations else np.array(self.state), reward, done, {}
-        
-    def _norm_obs(self, state):
-        # normalise into 0.0 to 1.0 range
-        return np.divide(np.array(state) + self.high, 2 * self.high)
+        return np.array(self.state), reward, done, {}
 
     def reset(self):
         self.state = self.np_random.uniform(low=-0.05, high=0.05, size=(4,))
         self.steps_beyond_done = None
-        return self._norm_obs(self.state) if self.normalise_observations else np.array(self.state)
+        return np.array(self.state)
 
     def render(self, mode='human'):
         screen_width = 600
