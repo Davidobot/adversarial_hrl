@@ -90,8 +90,8 @@ class AcrobotEnv(core.Env):
         self.observation_space = spaces.Box(low=low, high=high, dtype=np.float32)
         
         self.action_space = spaces.Box(
-            low=AVAIL_TORQUE[0],
-            high=AVAIL_TORQUE[2], shape=(1,),
+            low=-1.,
+            high=1., shape=(1,),
             dtype=np.float32
         )
         
@@ -108,7 +108,7 @@ class AcrobotEnv(core.Env):
 
     def step(self, a):
         s = self.state
-        torque = np.clip(a, AVAIL_TORQUE[0], AVAIL_TORQUE[2])[0]
+        torque = np.clip(a, -1., 1.)[0]
 
         # Add noise to the force action
         if self.torque_noise_max > 0:
