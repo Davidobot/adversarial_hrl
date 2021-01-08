@@ -30,14 +30,16 @@ class PointMazeEnv(gym.Env):
         100 if reached goal square; -0.1 otherwise for every timestep
 
     Starting State:
-        Starting state is [0, 0, 0]
+        Starting state is [U(-0.05, 0.05), U(-0.05, 0.05), (U(-0.05, 0.05) % (2pi)) / (2pi)]
         
         Note: moving with orientation of 0 is going to move the point right.
         The orientation increases anti-clockwise, so if in a state [0, 0, 0.25] (an orientation of pi/2)
         and executing action [0.5, 0] (move forward) will result in a new state [0, 0.5, 0.25]
 
     Episode Termination:
-        Reaching the goal square. Time limit is left up to the user; recommended is 500 for a scaling factor of 4
+        Reaching the goal square. Time limit is left up to the user; recommended is 500 for a scaling factor of 4.
+        
+        The environment (for 500 steps max; scale_factor=4) is considered "solved" if an agent achieves an average reward of 90 or more over the latest 100 episode.
     """
 
     metadata = {
@@ -151,7 +153,8 @@ class PointMazeEnv(gym.Env):
         return (self.state - self.starting_point) / self.state_normalisation_factor
     
     def reset(self):
-        self.state = np.array(self.starting_point, dtype=np.float32)
+        self.state = np.array(self.starting_point + np.random.uniform(-0.05, 0.05, self.starting_point.shape), dtype=np.float32)
+        self.state[2] = self.state[2] % (2 * math.pi)
         self.steps_beyond_done = None
         return self.normalised_state()
 
