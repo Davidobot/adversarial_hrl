@@ -148,7 +148,7 @@ class ContinuousCartPoleEnv(gym.Env):
         
         # complex reward scheme
         base_reward = 1.0
-        dist_away = math.min(1.0, math.abs(x / self.x_threshold))
+        dist_away = min(1.0, abs(x / self.x_threshold))
         dist_away = math.floor(dist_away / 0.25) # break up into 4 areas x=0 |--|--|--|--| x=2.4 (and mirrored)
         
         extra_reward = base_reward + dist_away # so areas have rewards x=0 |-1-|-2-|-3-|-4-| x=2.4 (and mirrored)
