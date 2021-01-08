@@ -27,7 +27,7 @@ class PointMazeEnv(gym.Env):
         1     Rotate    -pi/4       pi/4
 
     Reward:
-        100 if reached goal square; 0 otherwise
+        100 if reached goal square; -0.1 otherwise for every timestep
 
     Starting State:
         Starting state is [0, 0, 0]
@@ -37,7 +37,7 @@ class PointMazeEnv(gym.Env):
         and executing action [0.5, 0] (move forward) will result in a new state [0, 0.5, 0.25]
 
     Episode Termination:
-        Reaching the goal square. Time limit is left up to the user.
+        Reaching the goal square. Time limit is left up to the user; recommended is 500 for a scaling factor of 4
     """
 
     metadata = {
@@ -118,11 +118,11 @@ class PointMazeEnv(gym.Env):
 
         done = self.is_colliding(self.state[0], self.state[1], 'r')
 
-        reward = 0.0
+        reward = -0.1
         
         if done and self.steps_beyond_done is None:
             # solved the maze!
-            reward = 100.0
+            reward += 100.0
             self.steps_beyond_done = 0
         elif self.steps_beyond_done is not None:
             if self.steps_beyond_done == 0:
