@@ -8,33 +8,36 @@ import numpy as np
 class PointMazeEnv(gym.Env):
     """
     Description:
-        foo
+        Simple and fast-to-run implementation of PointMaze, based on AntMaze.
 
     Source:
-        bar
+        Inspired by https://github.com/tensorflow/models/tree/master/research/efficient-hrl/environments
 
     Observation:
-        Type: Box(4)
+        Type: Box(3)
         Num     Observation               Min                     Max
-        0       Cart Position             -4.8                    4.8
-        1       Cart Velocity             -Inf                    Inf
-        2       Pole Angle                -0.418 rad (-24 deg)    0.418 rad (24 deg)
-        3       Pole Angular Velocity     -Inf                    Inf
+        0       Point X co-ordinate       -1.5                    3.5
+        1       Point Y co-ordinate       -1.5                    3.5
+        2       Point Orientation         0.0                     1.0 (equivalent to 2pi)
 
     Actions:
-        Type: Discrete(2)
-        Num   Action
-        0     Push cart to the left
-        1     Push cart to the right
+        Type: Box(2)
+        Num   Action    Min         Max       
+        0     Move      -1./scale   1./scale
+        1     Rotate    -pi/4       pi/4
 
     Reward:
-        
+        100 if reached goal square; 0 otherwise
 
     Starting State:
+        Starting state is [0, 0, 0]
         
+        Note: moving with orientation of 0 is going to move the point right.
+        The orientation increases anti-clockwise, so if in a state [0, 0, 0.25] (an orientation of pi/2)
+        and executing action [0.5, 0] (move forward) will result in a new state [0, 0.5, 0.25]
 
     Episode Termination:
-        
+        Reaching the goal square. Time limit is left up to the user.
     """
 
     metadata = {
