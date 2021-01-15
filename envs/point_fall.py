@@ -5,10 +5,10 @@ from gym.utils import seeding
 import numpy as np
 
 
-class PointPushEnv(gym.Env):
+class PointFallEnv(gym.Env):
     """
     Description:
-        Simple and fast-to-run implementation of PointPush, based on AntPush.
+        Simple and fast-to-run implementation of PointFall, based on AntFall.
 
     Source:
         Inspired by https://github.com/tensorflow/models/tree/master/research/efficient-hrl/environments
@@ -16,8 +16,8 @@ class PointPushEnv(gym.Env):
     Observation:
         Type: Box(3)
         Num     Observation               Min                     Max
-        0       Point X co-ordinate       -2.5                    2.5
-        1       Point Y co-ordinate       -1.5                    3.5
+        0       Point X co-ordinate       -1.5                    2.5
+        1       Point Y co-ordinate       -1.5                    4.5
         2       Point Orientation         0.0                     1.0 (equivalent to 2pi)
 
     Actions:
@@ -52,11 +52,12 @@ class PointPushEnv(gym.Env):
         # m denotes a movable block
         # defined "right-side up" at the great expense of having to work with two y axis (0 at top, 0 at bottom)
         self.maze = [
-            [1, 1, 1, 1, 1],
-            [1, 1, 'r', 1, 1],
-            [1, 0, 'm', 0, 1],
-            [1, 0, 0, 1, 1],
-            [1, 1, 1, 1, 1],
+            [1, 1, 1, 1],
+            [1, 'r', 0, 1],
+            [1, 1, 0, 1],
+            [1, 0, 'm', 1],
+            [1, 0, 0, 1],
+            [1, 1, 1, 1],
         ]
         
         # scaling factor effects movement
@@ -65,7 +66,7 @@ class PointPushEnv(gym.Env):
         self.maze_height = len(self.maze)
         
         # x, y, orientation
-        self.starting_point = np.array([2.5, 1.5, 0.])
+        self.starting_point = np.array([1.5, 1.5, 0.])
         self.state_normalisation_factor = np.array([1., 1., 2. * math.pi])
         self.max_dist = 1. / self.SCALING_FACTOR
         self.max_turn = math.pi / 4
@@ -73,9 +74,9 @@ class PointPushEnv(gym.Env):
         # movable block
         self.block_offset = np.array([0., 0.])
         self.block_start  = np.array([2, 2])
-        self.block_movable_axis = np.array([1, 1]) # 1 indicates movable on given axis
-        self.block_axis_restrictions = np.array([0.8, 0.8]) # how far the block can move along each axis (symmetrical)
-        self.block_friction = 2.
+        self.block_movable_axis = np.array([0, 1]) # 1 indicates movable on given axis
+        self.block_axis_restrictions = np.array([0., 1.]) # how far the block can move along each axis (symmetrical)
+        self.block_friction = 0.5 # increase to make it more difficult
 
         # x_lim, y_lim, theta_lim
         high = np.array([self.maze_width - self.starting_point[0],
@@ -218,6 +219,9 @@ class PointPushEnv(gym.Env):
         sign = lambda x: math.copysign(1, x)
     
         bx, by = self.block_start + self.block_offset
+        
+        if self.block_offset[1] == 1.:
+            return False # block is fully pushed in, can move across
     
         if x >= bx and x < bx + 1 and y >= by and y < by + 1:
             # colliding with block
@@ -263,12 +267,12 @@ class PointPushEnv(gym.Env):
         self.state[2] = self.state[2] % (2 * math.pi)
         self.steps_beyond_done = None
         self.block_offset = np.array([0., 0.])
-        self.block_movable_axis = np.array([1, 1])
+        self.block_movable_axis = np.array([0, 1])
         return self.normalised_state()
 
     def render(self, mode='human'):
-        screen_width = 500
-        screen_height = 500
+        screen_width = 400
+        screen_height = 600
 
         world_width = self.maze_width
         block_size = screen_width/world_width
@@ -299,16 +303,16 @@ class PointPushEnv(gym.Env):
                         
                         self.viewer.add_geom(block)
             
-            point = rendering.make_circle(point_size / 2.)
-            point.add_attr(self.point_trans)
-            point.set_color(0.8, 0.2, 0.2)
-            self.viewer.add_geom(point)
-            
             movable = rendering.FilledPolygon([(0, 0), (0, block_size), (block_size, block_size), (block_size, 0)])
             movable.add_attr(rendering.Transform(translation=(self.block_start[0] * block_size, self.block_start[1] * block_size)))
             movable.add_attr(self.movable_trans)
             movable.set_color(0.2, 0.8, 0.2)
             self.viewer.add_geom(movable)
+            
+            point = rendering.make_circle(point_size / 2.)
+            point.add_attr(self.point_trans)
+            point.set_color(0.8, 0.2, 0.2)
+            self.viewer.add_geom(point)
             
             orientir = rendering.Line((0, 0), (0, 2 * point_size))
             orientir.linewidth.stroke = 5
