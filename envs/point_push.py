@@ -5,10 +5,10 @@ from gym.utils import seeding
 import numpy as np
 
 
-class PointMazeEnv(gym.Env):
+class PointPushEnv(gym.Env):
     """
     Description:
-        Simple and fast-to-run implementation of PointMaze, based on AntMaze.
+        Simple and fast-to-run implementation of PointPush, based on AntPush.
 
     Source:
         Inspired by https://github.com/tensorflow/models/tree/master/research/efficient-hrl/environments
@@ -48,11 +48,14 @@ class PointMazeEnv(gym.Env):
     }
 
     def __init__(self, scaling_factor=2):
+        # 1 is a solid wall; 'r' is the end square;
+        # m denotes a movable block
+        # defined "right-side up" at the great expense of having to work with two y axis (0 at top, 0 at bottom)
         self.maze = [
             [1, 1, 1, 1, 1],
-            [1, 'r', 0, 0, 1],
-            [1, 1, 1, 0, 1],
-            [1, 0, 0, 0, 1],
+            [1, 1, 'r', 1, 1],
+            [1, 0, 'm', 0, 1],
+            [1, 0, 0, 1, 1],
             [1, 1, 1, 1, 1],
         ]
         
@@ -62,10 +65,17 @@ class PointMazeEnv(gym.Env):
         self.maze_height = len(self.maze)
         
         # x, y, orientation
-        self.starting_point = np.array([1.5, 1.5, 0])
-        self.state_normalisation_factor = np.array([1., 1., 2 * math.pi])
+        self.starting_point = np.array([2.5, 1.5, 0.])
+        self.state_normalisation_factor = np.array([1., 1., 2. * math.pi])
         self.max_dist = 1. / self.SCALING_FACTOR
         self.max_turn = math.pi / 4
+        
+        # movable block
+        self.block_offset = np.array([0., 0.])
+        self.block_start  = np.array([2, 2])
+        self.block_movable_axis = np.array([1, 1]) # 1 indicates movable on given axis
+        self.block_axis_restrictions = np.array([0.8, 0.8]) # how far the block can move along each axis (symmetrical)
+        self.block_friction = 2.
 
         # x_lim, y_lim, theta_lim
         high = np.array([self.maze_width - self.starting_point[0],
@@ -79,7 +89,7 @@ class PointMazeEnv(gym.Env):
         
         # {max movement distance, max turn angle} in a single turn
         action_high = np.array([self.max_dist, self.max_turn], dtype=np.float32)
-        
+
         self.observation_space = spaces.Box(low, high, dtype=np.float32)
         self.action_space = spaces.Box(-action_high, action_high, dtype=np.float32)
 
@@ -101,21 +111,23 @@ class PointMazeEnv(gym.Env):
         ds = action[0]
         dtheta = action[1]
         
-        x, y, theta = self.state
+        _x, _y, theta = self.state
         
         # update theta and keep normalised to [0, 2pi] range
         theta = (theta + dtheta) % (2 * math.pi)
         # update position
-        x = x + math.cos(theta) * ds
-        y = y + math.sin(theta) * ds
+        x = _x + math.cos(theta) * ds
+        y = _y + math.sin(theta) * ds
         
-        wall_collision = self.is_colliding(x, y, 1)
-        if not wall_collision:
+        wall_collision = self.is_colliding_wall(_x, _y, x, y)
+        block_collision = self.resolve_block_collision(_x, _y, x, y)
+        
+        if not (wall_collision or block_collision):
             self.state[0] = x
             self.state[1] = y
             self.state[2] = theta
-
-        done = self.is_colliding(self.state[0], self.state[1], 'r')
+        
+        done = self.is_colliding_reward(self.state[0], self.state[1])
 
         reward = -0.1
         
@@ -135,15 +147,111 @@ class PointMazeEnv(gym.Env):
 
         return self.normalised_state(), reward, done, {}
     
-    # 1 is a solid wall; 'r' is the end square
-    def is_colliding(self, x, y, check_for = 1):
+    def is_colliding_reward(self, x, y):
         x = math.floor(x)
         y = math.floor(y)
         
         if x >= 0 and x < self.maze_width and y >= 0 and y < self.maze_height:
-            return self.maze[self.maze_height - 1 - y][x] == check_for
+            return self.maze[self.maze_height - 1 - y][x] == 'r'
         
-        return True
+        return False
+    
+    # https://love2d.org/forums/viewtopic.php?t=76752#p159136
+    def liang_barsky(self, l,t,w,h, x1,y1,x2,y2):
+        t0, t1 = 0, 1
+        dx, dy = x2-x1, y2-y1
+
+        for side in range(1, 5):
+            if side == 1:
+                p,q = -dx, x1 - l
+            elif side == 2:
+                p,q =  dx, l + w - x1
+            elif side == 3:
+                p,q = -dy, y1 - t
+            else:
+                p,q =  dy, t + h - y1
+
+            if p == 0:
+                if q < 0:
+                    return None
+            else:
+                r = q / p
+                if p < 0:
+                    if r > t1:
+                        return None
+                    elif r > t0:
+                        t0 = r
+                else:
+                    if r < t0:
+                        return None
+                    elif r < t1:
+                        t1 = r
+        return t0, t1
+    
+    # 1 is a solid wall; 'r' is the end square
+    # m denotes a movable block and the axis it can move in
+    def is_colliding_wall(self, _ox, _oy, _x, _y):
+        sign = lambda x: math.copysign(1, x)
+        x = math.floor(_x)
+        y = math.floor(_y)
+        ox = math.floor(_ox)
+        oy = math.floor(_oy)
+        
+        # simple check if landing on a impassable square
+        if x >= 0 and x < self.maze_width and y >= 0 and y < self.maze_height:
+            if self.maze[self.maze_height - 1 - y][x] == 1:
+                return True
+        
+        # perform rudimentary raycasting to prevent clipping through corners
+        for my in range(min(oy, y), max(oy, y) + 1):
+            for mx in range(min(ox, x), max(ox, x) + 1):
+                if self.maze[self.maze_height - 1 - my][mx] == 1:
+                    raycast = self.liang_barsky(mx, my, 1, 1, _ox, _oy, _x, _y)
+            
+                    if raycast is not None:
+                        return True
+        
+        return False
+    
+    # old x/y, new x/y
+    def resolve_block_collision(self, ox, oy, x, y):
+        sign = lambda x: math.copysign(1, x)
+    
+        bx, by = self.block_start + self.block_offset
+    
+        if x >= bx and x < bx + 1 and y >= by and y < by + 1:
+            # colliding with block
+            dx = self.block_movable_axis[0] * sign(x - ox) *\
+                 (abs(x - ox) - min(abs(bx - ox), abs(ox - bx - 1))) / self.block_friction
+            dy = self.block_movable_axis[1] * sign(y - oy) *\
+                 (abs(y - oy) - min(abs(by - oy), abs(oy - by - 1))) / self.block_friction
+            
+            # only move in one axis
+            dx *= (ox < bx or ox > bx + 1)
+            dy *= (oy < by or oy > by + 1)
+            
+            # restrict movement of block to one axis
+            if np.sum(self.block_movable_axis) == 2:
+                if abs(dx) > 0:
+                    self.block_movable_axis[1] = 0
+                    dy = 0
+                elif abs(dy) > 0:
+                    self.block_movable_axis[0] = 0
+                    dx = 0
+            
+            self.block_offset[0] += dx
+            self.block_offset[1] += dy
+            self.block_offset = np.clip(self.block_offset, -self.block_axis_restrictions, self.block_axis_restrictions)
+            
+            # do not move player if colliding with block
+            return True
+            
+        # raycast to avoid clipping through movable block corners
+        raycast = self.liang_barsky(bx, by, 1, 1, ox, oy, x, y)
+        if raycast is not None:
+            return True
+        
+        return False
         
     # starting point is always (0, 0); normalise theta to [0, 1]
     def normalised_state(self):
@@ -151,8 +259,11 @@ class PointMazeEnv(gym.Env):
     
     def reset(self):
         self.state = np.array(self.starting_point + np.random.uniform(-0.05, 0.05, self.starting_point.shape), dtype=np.float32)
+        self.state[2] += math.pi / 2. # start facing up
         self.state[2] = self.state[2] % (2 * math.pi)
         self.steps_beyond_done = None
+        self.block_offset = np.array([0., 0.])
+        self.block_movable_axis = np.array([1, 1])
         return self.normalised_state()
 
     def render(self, mode='human'):
@@ -171,10 +282,12 @@ class PointMazeEnv(gym.Env):
             self.point_trans = rendering.Transform()
             self.point_rot_trans = rendering.Transform()
             
+            self.movable_trans = rendering.Transform()
+            
             for yy in range(self.maze_height):
                 y = self.maze_height - 1 - yy
                 for x in range(self.maze_width):
-                    if self.maze[y][x] != 0:
+                    if self.maze[y][x] == 1 or self.maze[y][x] == 'r':
                         block = rendering.FilledPolygon([(0, 0), (0, block_size), (block_size, block_size), (block_size, 0)])
                         block_trans = rendering.Transform(translation=(x * block_size, yy * block_size))
                         block.add_attr(block_trans)
@@ -191,6 +304,12 @@ class PointMazeEnv(gym.Env):
             point.set_color(0.8, 0.2, 0.2)
             self.viewer.add_geom(point)
             
+            movable = rendering.FilledPolygon([(0, 0), (0, block_size), (block_size, block_size), (block_size, 0)])
+            movable.add_attr(rendering.Transform(translation=(self.block_start[0] * block_size, self.block_start[1] * block_size)))
+            movable.add_attr(self.movable_trans)
+            movable.set_color(0.2, 0.8, 0.2)
+            self.viewer.add_geom(movable)
+            
             orientir = rendering.Line((0, 0), (0, 2 * point_size))
             orientir.linewidth.stroke = 5
             orientir.add_attr(self.point_rot_trans)
@@ -204,6 +323,9 @@ class PointMazeEnv(gym.Env):
         x, y, theta = self.state
         self.point_trans.set_translation(x * block_size, y * block_size)
         self.point_rot_trans.set_rotation(theta - math.pi / 2) # tweak
+        
+        x, y = self.block_offset
+        self.movable_trans.set_translation(x * block_size, y * block_size)
 
         return self.viewer.render(return_rgb_array=mode == 'rgb_array')
 
