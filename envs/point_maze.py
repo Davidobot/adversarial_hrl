@@ -47,7 +47,7 @@ class PointMazeEnv(gym.Env):
         'video.frames_per_second': 50
     }
 
-    def __init__(self, scaling_factor=2):
+    def __init__(self, scaling_factor=4):
         self.maze = [
             [1, 1, 1, 1, 1],
             [1, 'r', 0, 0, 1],
