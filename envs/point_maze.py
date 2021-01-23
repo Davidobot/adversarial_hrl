@@ -19,6 +19,7 @@ class PointMazeEnv(gym.Env):
         0       Point X co-ordinate       -1.5                    3.5
         1       Point Y co-ordinate       -1.5                    3.5
         2       Point Orientation         0.0                     1.0 (equivalent to 2pi)
+        3       Time                      0.0                     max_steps / 10. (default: 50.0)
 
     Actions:
         Type: Box(2)
@@ -30,7 +31,7 @@ class PointMazeEnv(gym.Env):
         100 if reached goal square; -0.1 otherwise for every timestep
 
     Starting State:
-        Starting state is [U(-0.05, 0.05), U(-0.05, 0.05), (U(-0.05, 0.05) % (2pi)) / (2pi)]
+        Starting state is [U(-0.1, 0.1), U(-0.1, 0.1), (U(-0.1, 0.1) % (2pi)) / (2pi)]
         
         Note: moving with orientation of 0 is going to move the point right.
         The orientation increases anti-clockwise, so if in a state [0, 0, 0.25] (an orientation of pi/2)
@@ -47,7 +48,7 @@ class PointMazeEnv(gym.Env):
         'video.frames_per_second': 50
     }
 
-    def __init__(self, scaling_factor=4):
+    def __init__(self, scaling_factor=4, max_steps=500):
         self.maze = [
             [1, 1, 1, 1, 1],
             [1, 'r', 0, 0, 1],
@@ -70,11 +71,11 @@ class PointMazeEnv(gym.Env):
         # x_lim, y_lim, theta_lim
         high = np.array([self.maze_width - self.starting_point[0],
                          self.maze_height - self.starting_point[1],
-                         2 * math.pi],
+                         2 * math.pi, max_steps / 10.],
                         dtype=np.float32)
         low = np.array([-self.starting_point[0],
                         -self.starting_point[1],
-                        0.0],
+                        0.0, 0.0],
                        dtype=np.float32)
         
         # {max movement distance, max turn angle} in a single turn
@@ -87,6 +88,7 @@ class PointMazeEnv(gym.Env):
         self.viewer = None
         self.state = None
 
+        self.episode_steps = 0
         self.steps_beyond_done = None
         
         self.reset()
@@ -97,6 +99,8 @@ class PointMazeEnv(gym.Env):
 
     def step(self, action):
         action = np.clip(action, self.action_space.low, self.action_space.high)
+        
+        self.episode_steps += 1
         
         ds = action[0]
         dtheta = action[1]
@@ -147,12 +151,14 @@ class PointMazeEnv(gym.Env):
         
     # starting point is always (0, 0); normalise theta to [0, 1]
     def normalised_state(self):
-        return (self.state - self.starting_point) / self.state_normalisation_factor
+        return np.concatenate([(self.state - self.starting_point) / self.state_normalisation_factor, [self.episode_steps / 10.]])
     
     def reset(self):
-        self.state = np.array(self.starting_point + np.random.uniform(-0.05, 0.05, self.starting_point.shape), dtype=np.float32)
+        self.state = np.array(self.starting_point + np.random.uniform(-0.1, 0.1, self.starting_point.shape), dtype=np.float32)
         self.state[2] = self.state[2] % (2 * math.pi)
         self.steps_beyond_done = None
+        
+        self.episode_steps = 0
         return self.normalised_state()
 
     def render(self, mode='human'):
