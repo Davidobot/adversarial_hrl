@@ -71,7 +71,7 @@ class PointMazeEnv(gym.Env):
         # x_lim, y_lim, theta_lim
         high = np.array([self.maze_width - self.starting_point[0],
                          self.maze_height - self.starting_point[1],
-                         2 * math.pi, max_steps / 10.],
+                         1.0, max_steps / 10.],
                         dtype=np.float32)
         low = np.array([-self.starting_point[0],
                         -self.starting_point[1],
