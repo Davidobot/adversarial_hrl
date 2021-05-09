@@ -7,7 +7,7 @@ import glob, os
 
 def loc(nb):
     cells = load(open(nb))['cells']
-    return sum(len(c['source']) for c in cells if c['cell_type'] == 'code')
+    return sum(len([l for l in c['source'] if l.strip()]) for c in cells if c['cell_type'] == 'code')
 
 def run(ipynb_files):
     return sum(loc(nb) for nb in ipynb_files)
@@ -19,7 +19,7 @@ if __name__ == '__main__':
     tot = 0
     #print(glob.glob("*.py", recursive=True))
     for f in glob.glob("envs/**/*.py", recursive=True):
-        tot += sum(1 for line in open(f))
+        tot += sum(1 for line in open(f) if line.strip())
     for f in glob.glob("notebooks/**/*.py", recursive=True):
-        tot += sum(1 for line in open(f))
+        tot += sum(1 for line in open(f) if line.strip())
     print("py: ", tot)
